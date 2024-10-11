@@ -1,5 +1,6 @@
 import sys
 import json
+import math
 from tqdm import tqdm
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,46 +14,53 @@ def estimate_price(θ1, θ0, mileage):
     return θ1 * mileage + θ0
 
 
-def normalize(value, mean, std):
-    return (value - mean) / std
+def mean(data):
+    return sum(data) / len(data)
 
 
-def train(data, l_rate, epochs, error_fun):
-    θ1 = 0
+def normalize(data):
+    data_mean = mean(data)
+    data_std = math.sqrt(sum((value - data_mean) ** 2 for value in data) / len(data))
+    data = [(value - data_mean) / data_std for value in data]
+    return data, data_mean, data_std
+
+
+def train(data, l_rate, epochs, error_fun, threshold):
     θ0 = 0
-    mileage = data["km"]
-    prices = data["price"]
-    prices_mean = prices.mean()
-    mileage_mean = mileage.mean()
-    prices_std = prices.std()
-    mileage_std = mileage.std()
-    prices = [normalize(p, prices_mean, prices_std) for p in prices]
-    mileage = [normalize(m, mileage_mean, mileage_std) for m in mileage]
+    θ1 = 0
+
+    mileages, mileages_mean, mileages_std = normalize(data["km"])
+    prices, prices_mean, prices_std = normalize(data["price"])
+
     m = len(data)
-    for _ in tqdm(range(epochs)):
-        tmp0 = l_rate * (
-            sum(estimate_price(θ1, θ0, mileage[i]) - prices[i] for i in range(m)) / m
+    error = mean(
+        [error_fun(estimate_price(θ1, θ0, km) - p) for p, km in zip(data["price"], data["km"])]
+    )
+    for epoch in tqdm(range(epochs)):
+        denormalized_θ1 = θ1 * (prices_std / mileages_std)
+        denormalized_θ0 = prices_mean - denormalized_θ1 * mileages_mean
+        error = mean(
+            [
+                error_fun(estimate_price(denormalized_θ1, denormalized_θ0, km) - p)
+                for p, km in zip(data["price"], data["km"])
+            ]
         )
+        if threshold is not None and error <= threshold:
+            print("Threshold reached, stoping at epoch", epoch + 1)
+            break
+
+        tmp0 = l_rate * (sum(estimate_price(θ1, θ0, mileages[i]) - prices[i] for i in range(m)) / m)
         tmp1 = l_rate * (
-            sum(
-                (estimate_price(θ1, θ0, mileage[i]) - prices[i]) * mileage[i]
-                for i in range(m)
-            )
+            sum((estimate_price(θ1, θ0, mileages[i]) - prices[i]) * mileages[i] for i in range(m))
             / m
         )
-        θ1 -= tmp1
         θ0 -= tmp0
-    θ1 = θ1 * (prices_std / mileage_std)
-    θ0 = prices_mean - θ1 * mileage_mean
-    error = (
-        sum(
-            error_fun(estimate_price(θ1, θ0, km) - p)
-            for p, km in zip(data["price"], data["km"])
-        )
-        / m
-    )
+        θ1 -= tmp1
+
+    denormalized_θ1 = θ1 * (prices_std / mileages_std)
+    denormalized_θ0 = prices_mean - denormalized_θ1 * mileages_mean
     print(f"{error=}")
-    return θ1, θ0
+    return denormalized_θ1, denormalized_θ0
 
 
 def plot_result(data, θ1, θ0):
@@ -62,8 +70,8 @@ def plot_result(data, θ1, θ0):
     plt.plot(data["km"], y_line, color="red", label=f"y = {θ1}x + {θ0}")
     plt.xlabel("Kilometers Driven (km)")
     plt.ylabel("Price")
-    plt.axhline(0, color="black", lw=0.5, ls="--")
-    plt.axvline(0, color="black", lw=0.5, ls="--")
+    plt.axhline(0, color="black", lw=0.5, ls="solid")
+    plt.axvline(0, color="black", lw=0.5, ls="solid")
     plt.grid()
     plt.show()
 
@@ -77,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input-file",
         type=str,
-        help="Path of the input csv file with training data.",
+        help="Path of the input csv dataset with training data.",
         default="data/data.csv",
     )
 
@@ -116,19 +124,34 @@ if __name__ == "__main__":
         default="MAE",
     )
 
-    # TODO training error stop threshold
+    parser.add_argument(
+        "--error-threshold",
+        type=float,
+        help="Specify an error threshold below which the training stops.",
+    )
 
     args = parser.parse_args()
 
     try:
         data = pd.read_csv(args.input_file)
         assert "km" in data and "price" in data, "Invalid input data."
+
+        epochs = args.epochs
+        assert epochs >= 0, "Epochs must be a positive integer."
+
+        threshold = args.error_threshold
+
         error_fun = ERROR_FUNCTIONS[args.error_function]
-        θ1, θ0 = train(data, args.learning_rate, args.epochs, error_fun)
+        θ1, θ0 = train(data, args.learning_rate, epochs, error_fun, threshold)
         if args.plot:
             plot_result(data, θ1, θ0)
         with open(args.output_file, "w") as thetas:
-            json.dump({"θ1": θ1, "θ0": θ0}, thetas, indent=4, ensure_ascii=False)
+            json.dump(
+                {"θ1": θ1, "θ0": θ0},
+                thetas,
+                indent=4,
+                ensure_ascii=False,
+            )
     except Exception as e:
         print(e, file=sys.stderr)
         exit(1)
