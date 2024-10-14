@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--file",
         type=str,
-        help="Path of the json file with trained thetas.",
+        help="Path of the json file with trained thetas. Defaults to 'thetas.json'.",
         default="thetas.json",
     )
 

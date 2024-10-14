@@ -85,28 +85,28 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input-file",
         type=str,
-        help="Path of the input csv dataset with training data.",
+        help="Path of the input csv dataset with training data.Defaults to 'data/data.csv'.",
         default="data/data.csv",
     )
 
     parser.add_argument(
         "--output-file",
         type=str,
-        help="Path of the output json file with trained thetas.",
+        help="Path of the output json file with trained thetas. Defaults to 'thetas.json'.",
         default="thetas.json",
     )
 
     parser.add_argument(
         "--learning-rate",
         type=float,
-        help="Learning rate to use for training.",
+        help="Learning rate to use for training. Defaults to 0.01.",
         default=0.01,
     )
 
     parser.add_argument(
         "--epochs",
         type=int,
-        help="Number of training iterations.",
+        help="Number of training iterations. Defaults to 400.",
         default=400,
     )
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--error-function",
         type=str,
-        help="Choose the error function. Defaults to abs.",
+        help="Choose the error function. Defaults to MAE.",
         choices=list(ERROR_FUNCTIONS),
         default="MAE",
     )
