@@ -107,7 +107,7 @@ if __name__ == "__main__":
         "--epochs",
         type=int,
         help="Number of training iterations.",
-        default=250,
+        default=400,
     )
 
     parser.add_argument(
