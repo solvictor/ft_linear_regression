@@ -2,4 +2,5 @@
 42 ML Project that aims to perform a linear regression on a given dataset
 
 **Score** :
+<br>
 `125/100`
